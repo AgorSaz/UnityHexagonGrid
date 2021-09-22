@@ -156,6 +156,7 @@ MonoBehaviour:
   lessThan: 0.5
   multiplierHeight: 100
   exclude: 1
+  chunks: 2
   octaves: 1
   noiseScale: 0.0011
   generate: 1
