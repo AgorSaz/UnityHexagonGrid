@@ -22,7 +22,6 @@ public class HexagonGridGenerator : MonoBehaviour
     [Header("Testing ------------------------------------------------------------")]
     public MeshRenderer plane;
     
-
     [Header("Mesh References ------------------------------------------------------------")]
     MeshFilter meshFilter;
     MeshRenderer meshRenderer;
@@ -33,17 +32,12 @@ public class HexagonGridGenerator : MonoBehaviour
     private void Start()
     {
         plane.transform.localScale = Vector3.one * (gridScale / 10);
-
-        //gridScale *= 10;
-
         NoiseS3D.octaves = octaves;
         noise2D = NoiseS3D.GetNoiseTexture(gridScale * 10, gridScale * 10, 0, 0, noiseScale, true);
         plane.material.mainTexture = noise2D;
-
         meshFilter = gameObject.AddComponent<MeshFilter>();
         meshRenderer = gameObject.AddComponent<MeshRenderer>();
         meshRenderer.material = meshMaterial;
-        
     }
 
     private void Update()
@@ -54,30 +48,18 @@ public class HexagonGridGenerator : MonoBehaviour
     private void OnValidate()
     {
         plane.transform.localScale = Vector3.one * (gridScale / 10);
-
-        //gridScale *= 10;
-
         NoiseS3D.octaves = 10;
         noise2D = NoiseS3D.GetNoiseTexture(gridScale * 10, gridScale * 10, 0, 0, 0.0025f, true);
-        plane.material.mainTexture = noise2D;
-        if (meshFilter != null && generate)
-        {
-            StartBuilding();
-        }
+        plane.sharedMaterial.mainTexture = noise2D;
+        if (meshFilter != null && generate) { StartBuilding(); }
     }
 
     void StartBuilding()
     {
         meshFilter.mesh = null;
         mesh = new Mesh();
-
-        if (isBuilding)
-        {
-            StopAllCoroutines();
-        }
-
-            StartCoroutine(BuildGrid());
-        
+        if (isBuilding) { StopAllCoroutines(); }
+        StartCoroutine(BuildGrid());
     }
 
     IEnumerator BuildGrid()
@@ -157,7 +139,7 @@ public class HexagonGridGenerator : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns an array filled with all points of the hexagons with a "center" as the origin
+    /// Returns an array filled with all points of the hexagons with "center" as the origin
     /// </summary>
     /// <param name="center"  used as the origin of the hexagon ></param>
     /// <returns></returns>
@@ -203,26 +185,15 @@ public class HexagonGridGenerator : MonoBehaviour
     {
         Mesh mesh = meshF.mesh;
 
-
         // SET VERTICES
         List<Vector3> _vert = new List<Vector3>();
-        foreach(Vector3 v in mesh.vertices)
-        {
-            _vert.Add(v);
-        }
-        foreach(Vector3 v in points)
-        {
-            _vert.Add(v);
-        }
+        foreach(Vector3 v in mesh.vertices) { _vert.Add(v); }
+        foreach(Vector3 v in points) { _vert.Add(v); }
         mesh.vertices = _vert.ToArray();
-
 
         // SET  TRIANGLES
         List<int> _triang = new List<int>();
-        foreach(int t in mesh.triangles)
-        {
-            _triang.Add(t);
-        }
+        foreach(int t in mesh.triangles) { _triang.Add(t); }
         int[] triangles = new int[54] // 54
         {
             // TOP
@@ -238,26 +209,7 @@ public class HexagonGridGenerator : MonoBehaviour
 
             1,6,0,
 
-            //SIDE
-            /*1,2,8,
-            8,2,9,
-
-            2,3,9,
-            9,3,10,
-
-            3,4,10,
-            10,4,11,
-
-            4,5,11,
-            11,5,12,
-
-            5,6,12,
-            12,6,13,
-
-            6,1,13,
-            13,1,8*/
-
-            #region SIDE 0
+            // SIDE
             8,9,15,
             15,9,16,
 
@@ -275,35 +227,12 @@ public class HexagonGridGenerator : MonoBehaviour
 
             27,22,34,
             34,22,29
-            #endregion
-
         };
-        foreach(int t in triangles)
-        {
-            _triang.Add(t+(35*(index)));
-        }
+        foreach(int t in triangles) { _triang.Add(t + (35 * (index))); }
         mesh.triangles = _triang.ToArray();
 
         // CALCULATE NORMALS
         mesh.RecalculateNormals();
-
         meshF.mesh = mesh;
-    }
-
-    private void OnDrawGizmos()
-    {
-        return;
-        if (GetComponent<MeshFilter>() == null)
-            return;
-
-        Mesh mesh = GetComponent<MeshFilter>().mesh;
-        for (int i = 0; i < mesh.vertices.Length; i++)
-        {
-
-                    int center = (i < 14) ? 7 : 14;
-                    int next = ((i + 1) < mesh.vertices.Length) ? (i + 1) : center + 1;
-                    Vector3 dir = (((mesh.vertices[next] + mesh.vertices[i]) / 2) - mesh.vertices[center]).normalized;
-                    Gizmos.DrawLine(mesh.vertices[i], dir + mesh.vertices[i]);
-        }
     }
 }
