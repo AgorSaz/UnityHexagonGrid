@@ -3,27 +3,29 @@ using System.Collections.Generic;
 using UnityEngine;
 public class HexagonGridGenerator : MonoBehaviour
 {
-    [Header("Mesh Properties ------------------------------------------------------------")]
+    [Header("Mesh Properties -------------------------------------------------------------")]
     [Range(1,10)]public int hexagonSize;
-    public Material meshMaterial;
+    [SerializeField] Material meshMaterial;
 
-    [Header("Grid Properties ------------------------------------------------------------")]
-    public int gridScale;
+    [Header("Grid Properties -------------------------------------------------------------")]
+    [SerializeField] int gridScale;
     Texture2D noise2D;
     [Range(0,1)]public float lessThan;
-    public float multiplierHeight;
-    public bool exclude;
-    public int chunks = 1;
+    [SerializeField] float multiplierHeight;
+    [SerializeField] bool exclude;
+    [SerializeField] int chunks = 1;
+    [Range(0.001f,1f)][SerializeField] float updateTime;
 
     [Header("Noise Properties ------------------------------------------------------------")]
-    public int octaves;
-    public float noiseScale;
-    public bool generate;
+    [Range(1, 3)] [SerializeField] int octaves;
+    [Range(0.0001f, 0.001f)] [SerializeField] float noiseScale;
+    [SerializeField] bool generate;
+    [SerializeField] Vector2 offset;
 
-    [Header("Testing ------------------------------------------------------------")]
-    public MeshRenderer plane;
+    [Header("Testing ---------------------------------------------------------------------")]
+    [SerializeField] MeshRenderer plane;
     
-    [Header("Mesh References ------------------------------------------------------------")]
+    [Header("Mesh References -------------------------------------------------------------")]
     private MeshFilter meshFilter;
     private MeshRenderer meshRenderer;
     private bool isBuilding;
@@ -31,26 +33,25 @@ public class HexagonGridGenerator : MonoBehaviour
 
     private void Start()
     {
+        StartCoroutine(BuildGrid());
         SetPlaneProperties();
-
+        
         // Get references
         meshFilter = gameObject.AddComponent<MeshFilter>();
         meshRenderer = gameObject.AddComponent<MeshRenderer>();
         meshRenderer.material = meshMaterial;
+
+        isBuilding = true;
     }
 
     private void SetPlaneProperties()
     {
         plane.transform.localScale = Vector3.one * (gridScale / 10);
         NoiseS3D.octaves = octaves;
-        noise2D = NoiseS3D.GetNoiseTexture(gridScale * 10, gridScale * 10, 0, 0, noiseScale, true);
+        noise2D = NoiseS3D.GetNoiseTexture(gridScale * 10, gridScale * 10, offset.x * 100, offset.y * 100, noiseScale, true);
         plane.sharedMaterial.mainTexture = noise2D;
     }
 
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R)) { StartBuilding(); }
-    }
 
     /// <summary>
     /// Called every time a script value changes
@@ -58,29 +59,44 @@ public class HexagonGridGenerator : MonoBehaviour
     private void OnValidate()
     {
         SetPlaneProperties();
-        if (meshFilter != null && generate) { StartBuilding(); }
-    }
-
-    void StartBuilding()
-    {
-        meshFilter.mesh = null;
-        if (isBuilding) { StopAllCoroutines(); }
-        StartCoroutine(BuildGrid());
+        if (meshFilter != null && generate) { isBuilding = true; }
     }
 
     IEnumerator BuildGrid()
     {
-        isBuilding = true;
-        Vector3[] gridPoints = GetGridPoints(exclude, lessThan, multiplierHeight);
-        for (int i = 0; i < gridPoints.Length; i += chunks)
+        while (true)
         {
-            for (int c = 0; c < chunks; c++)
+            if (isBuilding)
             {
-                GenerateHexagonMesh(GetHexagonPoints(gridPoints[i+c], false), meshFilter, i+c);
+                isBuilding = true;
+                Vector3[] gridPoints = GetGridPoints(exclude, lessThan, multiplierHeight);
+                List<MeshFilter> hexagons = new List<MeshFilter>();
+                for (int i = 0; i < gridPoints.Length; i += chunks)
+                {
+                    for (int c = 0; c < chunks; c++)
+                    {
+                        hexagons.Add(GenerateHexagonMesh(GetHexagonPoints(gridPoints[i + c], false), i + c));
+                    }
+                }
+
+                CombineInstance[] combine = new CombineInstance[hexagons.Count];
+
+                int a = 0;
+                while (a < hexagons.Count)
+                {
+                    combine[a].mesh = hexagons[a].mesh;
+                    combine[a].transform = hexagons[a].transform.localToWorldMatrix;
+                    Destroy(hexagons[a].gameObject);
+                    a++;
+                }
+                meshFilter.mesh = new Mesh();
+                meshFilter.mesh.CombineMeshes(combine);
+                isBuilding = false;
             }
-            yield return new WaitForEndOfFrame();
+
+
+            yield return new WaitForSeconds(updateTime);
         }
-        isBuilding = false;
     }
 
     /// <summary>
@@ -108,7 +124,7 @@ public class HexagonGridGenerator : MonoBehaviour
                 xP = (xP * gridScale * 10) / 100;
                 yP = (yP * gridScale * 10) / 100;
 
-                Debug.Log($"({temp + (gridScale / 2)} : {i + (gridScale / 2)})  |  ({xP} : {yP})");
+                //Debug.Log($"({temp + (gridScale / 2)} : {i + (gridScale / 2)})  |  ({xP} : {yP})");
 
                 float height = noise2D.GetPixel((int)xP, (int)yP).grayscale;
                 
@@ -170,9 +186,14 @@ public class HexagonGridGenerator : MonoBehaviour
     /// <summary>
     /// Generates a meshed hexagon given the points of the hexagon, the MeshFilter of the target and the index of the hexagon in case its an array of hexagons
     /// </summary>
-    private void GenerateHexagonMesh(Vector3[] points, MeshFilter meshF, int index = 0)
+    private MeshFilter GenerateHexagonMesh(Vector3[] points, int index = 0)
     {
-        Mesh mesh = meshF.mesh;
+        GameObject g = new GameObject();
+        g.AddComponent<MeshFilter>();
+        g.GetComponent<MeshFilter>().mesh = new Mesh();
+        g.AddComponent<MeshRenderer>();
+
+        Mesh mesh = new Mesh();
 
         // SET VERTICES
         List<Vector3> _vert = new List<Vector3>();
@@ -217,11 +238,12 @@ public class HexagonGridGenerator : MonoBehaviour
             27,22,34,
             34,22,29
         };
-        foreach(int t in triangles) { _triang.Add(t + (35 * (index))); }
+        foreach (int t in triangles) { _triang.Add(t); }
         mesh.triangles = _triang.ToArray();
 
         // CALCULATE NORMALS
         mesh.RecalculateNormals();
-        meshF.mesh = mesh;
+        g.GetComponent<MeshFilter>().mesh = mesh;
+        return g.GetComponent<MeshFilter>();
     }
 }
